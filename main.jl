@@ -3,25 +3,34 @@ module App
 include("lib.jl")
 using .ClusterizationModule
 
-# Reading dataset from .csv file
+# Reading data from .csv file
 fileData = getDataSetFromCSV("creditcard.csv")
 
-
+# Getting values from data as the array of coordinates 
 xs = getDataFromColumnByName(fileData, "\"V1\"")
 ys = getDataFromColumnByName(fileData, "\"V3\"")
-zs = getDataFromColumnByName(fileData, "\"V6\"")
+# Uncomment this for only 'X' and 'Y' axis
+zs = zeros(getDataFromColumnByName(fileData, "\"V6\""))
+# zs = getDataFromColumnByName(fileData, "\"V6\"")
 
-print(linkData(xs, ys, zs))
-
+# Creating final dataset based on arrays of coordinates
 dataset = linkData(xs, ys, zs)
+
+# Creating points according to the following dataset
 points = determinePoints(dataset)
-println(getPointsProjections(points, "x"))
 
+# Defining count of the clusters
+clustersCount = 6
 
-# Removing headers from dataset
-# shift!(fileData)
-# Converting string values to floats of the dataset
-# dataset = convertToFloatData(fileData, 200, 10)
-# println(dataset)
+# Creating inital clusters
+clusters = defineInitialClusters(clustersCount, points)
+
+counter = 1;
+# Do clustering until clusters' centers will change
+while(!kmeansIteration(clusters, points))  
+    println("==============================")
+    counter += 1
+end
+println(`Iterations: $counter`)
 
 end

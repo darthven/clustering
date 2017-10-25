@@ -7,7 +7,7 @@ module ClusterizationModule
 #=
     Type of the point in the Cartesian coordinate system
 =#
-type Point{T<:Real}
+type Point{T <: Real}
     x::T
     y::T
     z::T
@@ -17,9 +17,9 @@ end
     Type of the cluster with center and points,
     which belongs to its set
 =#
-struct Cluster
-    points::Array{Point, 1}
+type Cluster 
     center::Point
+    points::Array{Point, 1}
 end
 
 #=
@@ -43,7 +43,7 @@ end
 =#
 function convertToFloatData(array::Array{Array{String, 1}, 1},
      rowNumber::Int64, colNumber::Int64)::Array{Float64, 2}
-    arrayOfFloats = Array{Float64, 2}(rowNumber, colNumber);   
+    arrayOfFloats = Array{Float64, 2}(rowNumber, colNumber)
     for i::Int64 = 1 : rowNumber
         for j::Int64 = 1 : colNumber
             arrayOfFloats[i, j] = parse(Float64, array[i][j]) 
@@ -71,7 +71,7 @@ end
 =#
 function getDataFromColumnByIndex(array::Array{Array{String, 1}, 1},
      index::Int64)::Array{Float64, 1} 
-    dataFromColumn = Array{Float64, 1}(0);
+    dataFromColumn = Array{Float64, 1}(0)
     for i::Int64 = 2 : size(array, 1)
         push!(dataFromColumn, parse(Float64, array[i][index])) 
     end   
@@ -139,8 +139,106 @@ function getPointsProjections(points::Array{Point, 1},
     coords
 end
 
+#=
+    Function that returns point by random index
+    from the array of points   
+=#
+function getRandomPoint(points::Array{Point, 1})::Point
+    index::Int64 = rand(1: size(points, 1))
+    points[index];
+end
+
+#=
+    Function that creates initial clusters   
+=#
+function defineInitialClusters(clustersCount::Int64, points::Array{Point, 1})::Array{Cluster, 1}
+    clusters = Array{Cluster, 1}(clustersCount)    
+    for i = 1 : clustersCount
+        center = getRandomPoint(points)
+        cluster = Cluster(center, [center])
+        clusters[i] = cluster
+    end
+    clusters
+end
+
+#=
+    Function that returns distance between two points 
+=#
+function distance(point1::Point, point2::Point)::Float64   
+    norm([point1.x, point1.y, point1.z] - [point2.x, point2.y, point2.z])    
+end
+
+#=
+    Function that returns distances' matrix based on distances between
+    clusters' centers and all the points
+=#
+function getDistanceMatrix(points::Array{Point, 1}, clusters::Array{Cluster, 1})::Matrix{Float64}
+    distanceMatrix = Matrix{Float64}(length(points), length(clusters))
+    for i::Int64 = 1 : length(points)
+        for j::Int64 = 1 : length(clusters)
+            distanceMatrix[i, j] = distance(points[i], clusters[j].center)
+        end
+    end    
+    distanceMatrix
+end
+
+#=
+    Function that compares two points by their coordinates  
+=#
+function comparePointsCoordinates(point1::Point, point2::Point)
+   point1.x == point2.x && point1.y == point2.y && point1.z == point2.z
+end
+
+#=
+    Function that returns new center of the cluster as the center of mass   
+=#
+function getNewClusterCenter(cluster::Cluster)::Point   
+    x::Float64 = reduce(+, getPointsProjections(cluster.points, "x")) / length(cluster.points)
+    y::Float64 = reduce(+, getPointsProjections(cluster.points, "y")) / length(cluster.points)
+    z::Float64 = reduce(+, getPointsProjections(cluster.points, "z")) / length(cluster.points)    
+    Point(x, y, z)    
+end
+
+#=
+    Function that makes one iteration of the clustering 
+=#
+function kmeansIteration(clusters::Array{Cluster, 1}, points::Array{Point, 1})::Bool 
+    status::Bool  = false;     
+    distanceMatrix::Matrix{Float64} = getDistanceMatrix(points, clusters)      
+    for i::Int64 = 1 : size(distanceMatrix, 1)
+        minIndex::Int64 = indmin(distanceMatrix[i, 1 : size(distanceMatrix, 2)])  
+        if(!(points[i] in clusters[minIndex].points))            
+            push!(clusters[minIndex].points, points[i])    
+        end
+        for j::Int64 = 1 : size(distanceMatrix, 2)
+            if(j != minIndex && (points[i] in clusters[minIndex].points))                                 
+                clusters[j].points = filter!(pnt -> pnt != points[i], clusters[j].points)                     
+            end
+        end      
+    end
+    for cl::Cluster in clusters
+        newCenter::Point = getNewClusterCenter(cl)
+        if(comparePointsCoordinates(cl.center, newCenter))
+           status = true; 
+        else
+           cl.center = newCenter
+        end
+    end
+
+    # Display clustering iteration
+    for k::Int64 = 1 : length(clusters)
+        println(`CLUSTER $k`)
+        println(clusters[k])
+        println(`SIZE $(length(clusters[k].points))`)
+    end
+    status   
+end
+
+
 export Point, Cluster, getDataSetFromCSV, convertToFloatData, getColumnIndexByName,
-    getDataFromColumnByIndex, getDataFromColumnByName, linkData, determinePoints, getPointsProjections
+    getDataFromColumnByIndex, getDataFromColumnByName, linkData, determinePoints, getPointsProjections,
+    getRandomPoint, defineInitialClusters, distance, getDistanceMatrix, comparePointsCoordinates,
+    getNewClusterCenter, kmeansIteration
 end
 
 

@@ -4,6 +4,8 @@
 =#
 module ClusterizationModule
 
+using DataFrames
+
 #=
     Type of the point in the Cartesian coordinate system
 =#
@@ -26,93 +28,34 @@ end
     Function that returns array of arrays
     of string values by reading of .csv file
 =#
-function getDataSetFromCSV(filename::String)::Array{Array{String, 1}, 1}
-    arrayOfData::Array{Array{String, 1}, 1} = []
-    open(filename) do file   
-        for line::String in eachline(file)
-          push!(arrayOfData, split(line, ','))  
-        end    
-    end   
-    arrayOfData
+function datasetFromCSV(filename::String, customNastrings...)::DataFrame   
+    readtable(filename, nastrings=["NA", "na", "n/a", "missing", customNastrings...])       
 end    
-
-#=
-    Function that converts array of arrays
-    of string values to the 2-dimensional array
-    of parsed values to float format 
-=#
-function convertToFloatData(array::Array{Array{String, 1}, 1},
-     rowNumber::Int64, colNumber::Int64)::Array{Float64, 2}
-    arrayOfFloats = Array{Float64, 2}(rowNumber, colNumber)
-    for i::Int64 = 1 : rowNumber
-        for j::Int64 = 1 : colNumber
-            arrayOfFloats[i, j] = parse(Float64, array[i][j]) 
-        end
-    end    
-    arrayOfFloats
-end
-
-#=
-    Function that gets index of the column from dataset
-    by its name (if it contains it)    
-=#
-function getColumnIndexByName(array::Array{Array{String, 1}, 1},
-     colName::String)::Int64 
-    for i::Int64 = 1 : size(array[1], 1)
-        if(array[1][i] == colName)           
-            return i
-        end
-    end   
-    return -1
-end
-
-#=
-    Function that returns column's data by its index in dataset    
-=#
-function getDataFromColumnByIndex(array::Array{Array{String, 1}, 1},
-     index::Int64)::Array{Float64, 1} 
-    dataFromColumn = Array{Float64, 1}(0)
-    for i::Int64 = 2 : size(array, 1)
-        push!(dataFromColumn, parse(Float64, array[i][index])) 
-    end   
-    dataFromColumn
-end
-
-#=
-    Function that returns column's data by its name in dataset    
-=#
-function getDataFromColumnByName(array::Array{Array{String, 1}, 1},
-     colName::String)::Array{Float64, 1}       
-    dataFromColumn = Array{Float64, 1}(0);
-    colIndex::Int64 = getColumnIndexByName(array, colName) 
-    for i::Int64 = 2 : size(array, 1)          
-        push!(dataFromColumn, parse(Float64, array[i][colIndex])) 
-    end   
-    dataFromColumn
-end
 
 #=
     Function that links columns of the dataset into 2-d matrix
 =#
-function linkData(arrays...)::Matrix{Float64}
-    result = Matrix{Float64}(size(arrays[1], 1), length(arrays))
-    for i::Int64 = 1 : size(arrays[1], 1)
-        for j::Int64 = 1 : length(arrays)
-            result[i, j] = arrays[j][i]
+function datasetValues(dataset::DataFrame, columnNames...)::Matrix{Float64}    
+    selectedData::DataFrame = dataset[:, map(Symbol, [columnNames...])] 
+    values = Matrix{Float64}(nrow(selectedData), ncol(selectedData))
+    # Excluding headers and rows' numbers
+    for i::Int64 = 1 : nrow(selectedData)
+        for j::Int64 = 1 : ncol(selectedData)
+            values[i, j] = selectedData[i, j]
         end
-    end    
-    result
+    end
+    values
 end
 
 #=
     Function that creates array of the points based on the chosen dataset,
     represented in 2-d matrix
 =#
-function determinePoints(dataset::Matrix{Float64})::Array{Point, 1}
-    len::Int64 = size(dataset, 1)
+function determinePoints(datasetValues::Matrix{Float64})::Array{Point, 1}
+    len::Int64 = size(datasetValues, 1)
     points = Array{Point, 1}(len)  
     for i::Int64 = 1 : len
-        point = Point(dataset[i, 1], dataset[i, 2], dataset[i, 3])      
+        point = Point(datasetValues[i, 1], datasetValues[i, 2], datasetValues[i, 3])      
         points[i] = point      
     end  
     points
@@ -122,8 +65,7 @@ end
     Function that creates array of points' projections
     based on the selected axis ("x", "y", "z")
 =#
-function getPointsProjections(points::Array{Point, 1},
-     axis::String)::Array{Float64, 1}
+function pointsProjections(points::Array{Point, 1}, axis::String)::Array{Float64, 1}
     coords = Array{Float64, 1}(0)
     for p::Point in points
         if(lowercase(axis) == "x")
@@ -143,7 +85,7 @@ end
     Function that returns point by random index
     from the array of points   
 =#
-function getRandomPoint(points::Array{Point, 1})::Point
+function randomPoint(points::Array{Point, 1})::Point
     index::Int64 = rand(1: size(points, 1))
     points[index];
 end
@@ -154,7 +96,7 @@ end
 function defineInitialClusters(clustersCount::Int64, points::Array{Point, 1})::Array{Cluster, 1}
     clusters = Array{Cluster, 1}(clustersCount)    
     for i = 1 : clustersCount
-        center = getRandomPoint(points)
+        center = randomPoint(points)
         cluster = Cluster(center, [center])
         clusters[i] = cluster
     end
@@ -172,7 +114,7 @@ end
     Function that returns distances' matrix based on distances between
     clusters' centers and all the points
 =#
-function getDistanceMatrix(points::Array{Point, 1}, clusters::Array{Cluster, 1})::Matrix{Float64}
+function distanceMatrix(points::Array{Point, 1}, clusters::Array{Cluster, 1})::Matrix{Float64}
     distanceMatrix = Matrix{Float64}(length(points), length(clusters))
     for i::Int64 = 1 : length(points)
         for j::Int64 = 1 : length(clusters)
@@ -192,11 +134,23 @@ end
 #=
     Function that returns new center of the cluster as the center of mass   
 =#
-function getNewClusterCenter(cluster::Cluster)::Point   
-    x::Float64 = reduce(+, getPointsProjections(cluster.points, "x")) / length(cluster.points)
-    y::Float64 = reduce(+, getPointsProjections(cluster.points, "y")) / length(cluster.points)
-    z::Float64 = reduce(+, getPointsProjections(cluster.points, "z")) / length(cluster.points)    
+function centerMassOfCluster(cluster::Cluster)::Point   
+    x::Float64 = reduce(+, pointsProjections(cluster.points, "x")) / length(cluster.points)
+    y::Float64 = reduce(+, pointsProjections(cluster.points, "y")) / length(cluster.points)
+    z::Float64 = reduce(+, pointsProjections(cluster.points, "z")) / length(cluster.points)    
     Point(x, y, z)    
+end
+
+#=
+    Function for displaying clusters
+=#
+function displayCluster(clusters::Array{Cluster, 1})
+    # Display clustering iteration
+    for i::Int64 = 1 : length(clusters)
+        println("CLUSTER $i:")
+        println(clusters[i])
+        println("SIZE: $(length(clusters[i].points))")
+    end
 end
 
 #=
@@ -204,41 +158,49 @@ end
 =#
 function kmeansIteration(clusters::Array{Cluster, 1}, points::Array{Point, 1})::Bool 
     status::Bool  = false;     
-    distanceMatrix::Matrix{Float64} = getDistanceMatrix(points, clusters)      
-    for i::Int64 = 1 : size(distanceMatrix, 1)
-        minIndex::Int64 = indmin(distanceMatrix[i, 1 : size(distanceMatrix, 2)])  
+    dtMatrix::Matrix{Float64} = distanceMatrix(points, clusters)      
+    for i::Int64 = 1 : size(dtMatrix, 1)
+        minIndex::Int64 = indmin(dtMatrix[i, 1 : size(dtMatrix, 2)])  
         if(!(points[i] in clusters[minIndex].points))            
             push!(clusters[minIndex].points, points[i])    
         end
-        for j::Int64 = 1 : size(distanceMatrix, 2)
+        for j::Int64 = 1 : size(dtMatrix, 2)
             if(j != minIndex && (points[i] in clusters[minIndex].points))                                 
                 clusters[j].points = filter!(pnt -> pnt != points[i], clusters[j].points)                     
             end
         end      
     end
     for cl::Cluster in clusters
-        newCenter::Point = getNewClusterCenter(cl)
+        newCenter::Point = centerMassOfCluster(cl)
         if(comparePointsCoordinates(cl.center, newCenter))
            status = true; 
         else
            cl.center = newCenter
         end
     end
-
-    # Display clustering iteration
-    for k::Int64 = 1 : length(clusters)
-        println(`CLUSTER $k`)
-        println(clusters[k])
-        println(`SIZE $(length(clusters[k].points))`)
-    end
+    # displayClustersInfo(clusters)
     status   
 end
 
+#=
+    Function that makes the whole clustering by the k-means algorithm
+=#
+function kmeans(clustersCount::Int64, datasetValues::Matrix{Float64})::Array{Cluster, 1}
+    iteration = 0;
+    # Creating points based on dataset
+    points::Array{Point, 1} = determinePoints(datasetValues)
+    # Creating inital clusters
+    clusters::Array{Cluster, 1} = defineInitialClusters(clustersCount, points)
+    # Do clustering until clusters' centers will change
+    while(!kmeansIteration(clusters, points))  
+        iteration += 1
+    end
+    println("Iterations: $iteration") 
+    return clusters
+end
 
-export Point, Cluster, getDataSetFromCSV, convertToFloatData, getColumnIndexByName,
-    getDataFromColumnByIndex, getDataFromColumnByName, linkData, determinePoints, getPointsProjections,
-    getRandomPoint, defineInitialClusters, distance, getDistanceMatrix, comparePointsCoordinates,
-    getNewClusterCenter, kmeansIteration
+export Point, Cluster, datasetFromCSV, datasetValues, kmeans
+
 end
 
 

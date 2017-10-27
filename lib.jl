@@ -127,7 +127,7 @@ end
 #=
     Function that compares two points by their coordinates  
 =#
-function comparePointsCoordinates(point1::Point, point2::Point)
+function comparePointsCoordinates(point1::Point, point2::Point)::Bool
    point1.x == point2.x && point1.y == point2.y && point1.z == point2.z
 end
 
@@ -144,7 +144,7 @@ end
 #=
     Function for displaying clusters
 =#
-function displayCluster(clusters::Array{Cluster, 1})
+function displayCluster(clusters::Array{Cluster, 1})::Void
     # Display clustering iteration
     for i::Int64 = 1 : length(clusters)
         println("CLUSTER $i:")

@@ -95,8 +95,8 @@ end
 =#
 function defineInitialClusters(clustersCount::Int64, points::Array{Point, 1})::Array{Cluster, 1}
     clusters = Array{Cluster, 1}(clustersCount)    
-    for i = 1 : clustersCount
-        center = randomPoint(points)
+    for i::Int64 = 1 : clustersCount
+        center::Point = randomPoint(points)
         cluster = Cluster(center, [center])
         clusters[i] = cluster
     end
@@ -118,7 +118,7 @@ function distanceMatrix(points::Array{Point, 1}, clusters::Array{Cluster, 1})::M
     distanceMatrix = Matrix{Float64}(length(points), length(clusters))
     for i::Int64 = 1 : length(points)
         for j::Int64 = 1 : length(clusters)
-            distanceMatrix[i, j] = distance(points[i], clusters[j].center)
+            distanceMatrix[i, j]::Float64 = distance(points[i], clusters[j].center)
         end
     end    
     distanceMatrix
@@ -186,7 +186,7 @@ end
     Function that makes the whole clustering by the k-means algorithm
 =#
 function kmeans(clustersCount::Int64, datasetValues::Matrix{Float64})::Array{Cluster, 1}
-    iteration = 0;
+    iteration::Int64 = 0;
     # Creating points based on dataset
     points::Array{Point, 1} = determinePoints(datasetValues)
     # Creating inital clusters
